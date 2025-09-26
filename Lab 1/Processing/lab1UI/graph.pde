@@ -8,23 +8,11 @@ Serial myPort;
 String inString = ""; 
 
 
-//getters
+//getters for confidence and Heartrate
 int lastHR = 0;
 int lastConf = 0;
-int graphGetAge() {
-  try {
-    Textfield tf = cp5.get(Textfield.class, "age");
-    if (tf == null) return 0;
-    String s = tf.getText();
-    if (s == null) return 0;
-    s = trim(s);
-    if (s.length() == 0) return 0;
-    int a = Integer.parseInt(s);
-    return constrain(a, 5, 100);
-  } catch (Exception e) {
-    return 0;
-  }
-}
+//need blood oxygen level, interval between heart beats
+
 
 class LineChart {
   int min = 20;
@@ -53,7 +41,10 @@ class LineChart {
     }
   }
   void addShift(int v, color c){
-      v = constrain(v, min, max);       
+    
+    //line kept bleeding off graph so I added this
+    v = constrain(v, min, max);      
+    
     values.remove(0);
     values.append(v);
     colors.remove(0);
@@ -100,6 +91,8 @@ void serialEvent(Serial p) {
     } else {
       println(json);
       myChart.addShift(json.getInt("HR"),RED);
+      
+      //added getters
       lastHR = json.getInt("HR");
       lastConf = json.getInt("Conf"); 
     }
@@ -121,5 +114,6 @@ void serialEvent(Serial p) {
   */
 } 
 
+//getter functions 
 int graphGetHR() {return lastHR;}
 int graphGetConf() { return lastConf; }
