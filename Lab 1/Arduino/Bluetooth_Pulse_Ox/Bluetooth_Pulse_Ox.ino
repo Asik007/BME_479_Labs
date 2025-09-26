@@ -31,7 +31,7 @@
 // Reset pin, MFIO pin
 int resPin = 4;
 int mfioPin = 13;
-int Buzzer = 2;
+const int Buzzer = 12;
 
 // Takes address, reset pin, and MFIO pin.
 SparkFun_Bio_Sensor_Hub bioHub(resPin, mfioPin); 
@@ -54,12 +54,21 @@ bioData body;
 
 // }
 
-
+//buzzer helper //TODO BROKEN
+void beepTwice() {
+  tone(Buzzer, 85, 200);  // 1.2 kHz for 200 ms
+  delay(260);               // small gap so calls don’t overlap
+  tone(Buzzer, 85, 200);
+  delay(220);
+  noTone(Buzzer);
+}
 
 void setup(){
 
   Serial.begin(115200);
 
+
+  
   Wire.begin();
   int result = bioHub.begin();
   if (result == 0) // Zero errors!
@@ -90,9 +99,9 @@ void setup(){
   int i = 0;
 
   pinMode(Buzzer, OUTPUT);
-  tone(Buzzer, 85);
-  delay(1000);
-  noTone(Buzzer);
+  // tone(Buzzer, 85);
+  // delay(1000);
+  // noTone(Buzzer);
 
 //   while(body.status == 3 && i <= 30){
 //     body.heartRate;
@@ -112,11 +121,27 @@ void loop(){
     doc["Conf"] = body.confidence;
     doc["Stat"] = body.status;
     serializeJson(doc, Serial);
-      tone(Buzzer, 10000);
-      // digitalWrite(Buzzer, HIGH);
-    delay(1000);
-      // digitalWrite(Buzzer, LOW);
 
-    noTone(Buzzer);
-    delay(500); 
+
+  //TODO BROKEN
+  // listen for a command from Processing and beep twice when requested
+  if (Serial.available() > 0) {
+    String cmd = Serial.readStringUntil('\n');
+    cmd.trim();
+    if (cmd == "BEEP2") {
+      beepTwice();
+  }
+}
+
+// small pacing delay
+delay(10);
+
+    
+    //   tone(Buzzer, 10000);
+    //   // digitalWrite(Buzzer, HIGH);
+    // delay(1000);
+    //   // digitalWrite(Buzzer, LOW);
+
+    // noTone(Buzzer);
+    // delay(500); 
 }

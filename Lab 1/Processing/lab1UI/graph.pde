@@ -1,9 +1,30 @@
+//Reads data from arduino, creates graph
+
 import controlP5.*;
 import processing.serial.*; 
 
 ControlP5 cp5;
 Serial myPort;
-String inString;
+String inString = ""; 
+
+
+//getters
+int lastHR = 0;
+int lastConf = 0;
+int graphGetAge() {
+  try {
+    Textfield tf = cp5.get(Textfield.class, "age");
+    if (tf == null) return 0;
+    String s = tf.getText();
+    if (s == null) return 0;
+    s = trim(s);
+    if (s.length() == 0) return 0;
+    int a = Integer.parseInt(s);
+    return constrain(a, 5, 100);
+  } catch (Exception e) {
+    return 0;
+  }
+}
 
 class LineChart {
   int min = 20;
@@ -32,6 +53,7 @@ class LineChart {
     }
   }
   void addShift(int v, color c){
+      v = constrain(v, min, max);       
     values.remove(0);
     values.append(v);
     colors.remove(0);
@@ -44,11 +66,11 @@ color YELLOW = color(255,255,0);
 
 LineChart myChart;
 
-void setup(){
-  size(400,400);
+void graphSetup(){
+ // size(400,400);
   cp5 = new ControlP5(this);
   cp5.addTextfield("age")
-    .setPosition(20,20)
+    .setPosition(40,20)
     .setAutoClear(false)
     ;
   
@@ -59,7 +81,7 @@ void setup(){
   myChart = new LineChart(300);
 }
 
-void draw(){
+void graphDraw(){
   //myChart.addShift(int(random(20,120)),RED);
   myChart.draw(50,100,300,200);
   //println("Hello world");
@@ -78,6 +100,8 @@ void serialEvent(Serial p) {
     } else {
       println(json);
       myChart.addShift(json.getInt("HR"),RED);
+      lastHR = json.getInt("HR");
+      lastConf = json.getInt("Conf"); 
     }
     // HR, Conf, Stat
     // Stat needs to be 3
@@ -85,6 +109,7 @@ void serialEvent(Serial p) {
     inString = "";
   }
   
+
   /*
   JSONObject json = parseJSONObject(inString);
   if (json == null) {
@@ -95,3 +120,6 @@ void serialEvent(Serial p) {
   }
   */
 } 
+
+int graphGetHR() {return lastHR;}
+int graphGetConf() { return lastConf; }
