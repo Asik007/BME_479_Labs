@@ -56,12 +56,20 @@ bioData body;
 
 //buzzer helper //TODO BROKEN
 void beepTwice() {
-  tone(Buzzer, 85, 200);  // 1.2 kHz for 200 ms
+  tone(Buzzer, 1200, 200);  // 1.2 kHz for 200 ms
   delay(260);               // small gap so calls don’t overlap
-  tone(Buzzer, 85, 200);
+  tone(Buzzer, 1200, 200);
   delay(220);
   noTone(Buzzer);
 }
+
+//if buzzer   is active
+// void beepTwice() {
+//   digitalWrite(Buzzer, HIGH); delay(200);
+//   digitalWrite(Buzzer, LOW);  delay(260);
+//   digitalWrite(Buzzer, HIGH); delay(200);
+//   digitalWrite(Buzzer, LOW);
+// }
 
 void setup(){
 
@@ -125,12 +133,11 @@ void loop(){
 
   //TODO BROKEN
   // listen for a command from Processing and beep twice when requested
-  if (Serial.available() > 0) {
-    String cmd = Serial.readStringUntil('\n');
-    cmd.trim();
-    if (cmd == "BEEP2") {
+  while (Serial.available() > 0) {
+    int c = Serial.read();
+    if(c == 'b' || c == 'B'){
       beepTwice();
-  }
+    }
 }
 
 // small pacing delay
