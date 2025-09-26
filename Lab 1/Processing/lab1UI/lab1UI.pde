@@ -39,8 +39,8 @@ boolean stressedActive = false;
 long    stressedStartMs = 0;
 int     stressedDurationMs = 60000;  // 60 seconds
 
-int     stressedDeltaBpm = 1;        // ≥ resting + 5 bpm = stressed
-int     stressedDwellMs  = 3000;     // hold 3 sec to switch
+int     stressedDeltaBpm = 1;        // threshhold to call it stressed
+int     stressedDwellMs  = 1000;     // hold 3 sec to switch
 
 boolean userIsStressed   = false;    // stressed state flag
 long    stressedCandStart = 0;       // timer for becoming stressed
@@ -80,6 +80,7 @@ void startStressed() {
   stressedActive   = true;
   stressedStartMs  = millis();
   userIsStressed   = false;
+  //prevUserIsStressed = false;
   stressedCandStart = 0;
   deStressCandStart = 0;
 
@@ -93,6 +94,9 @@ void startStressed() {
 
 void stopStressed() {
   stressedActive = false;
+
+  stressedCandStart = 0;           
+  deStressCandStart = 0;
 }
 
 
@@ -274,7 +278,7 @@ if (stressedActive && restingHR > 0 && conf >= calmMinConf) {
 // TODO BROKEN
 if (!prevUserIsStressed && userIsStressed) {
   try {
-    myPort.write("BEEP2\n");   // sends the command to Arduino
+    myPort.write('b');   // sends the command to Arduino
   } catch (Exception ex) {
     println("Serial write failed: " + ex);
   }
@@ -309,9 +313,9 @@ String label;
 color labelColor;
 
 // Priority: Stressed, then Calm (if calm logic said calm), else Resting
-if (userIsStressed) {
+if (stressedActive && userIsStressed) {
   label = "Stressed"; labelColor = color(255,120,120);
-} else if (calmActive && /* your calm flag, e.g. */ userIsCalm) {
+} else if (calmActive && userIsCalm) {
   label = "Calm";     labelColor = color(140,220,170);
 } else {
   label = "Resting";  labelColor = color(210);
@@ -328,4 +332,9 @@ fill(labelColor); textAlign(CENTER, CENTER); textSize(20); text(label, bx + w/2,
 popStyle();
   
 }
-  
+//  void keyPressed() {
+//  if (key == 'b' || key == 'B') {
+//    println(">>> manual BEEP2");
+//    myPort.write('b');
+//  }
+//}
