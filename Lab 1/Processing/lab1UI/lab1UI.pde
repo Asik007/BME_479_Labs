@@ -39,8 +39,8 @@ boolean stressedActive = false;
 long    stressedStartMs = 0;
 int     stressedDurationMs = 60000;  // 60 seconds
 
-int     stressedDeltaBpm = 1;        // threshhold to call it stressed
-int     stressedDwellMs  = 1000;     // hold 3 sec to switch
+int     stressedDeltaBpm = 5;        // threshhold to call it stressed
+int     stressedDwellMs  = 3000;     // hold 3 sec to switch
 
 boolean userIsStressed   = false;    // stressed state flag
 long    stressedCandStart = 0;       // timer for becoming stressed
