@@ -1,219 +1,185 @@
-//main file for the UI
+// ===== Lab1UI.pde =====
+// Modes only control music/overlays. Classifier (Calm/Stressed/Resting) runs continuously once baseline exists.
 
-//THIS IS PART 2. WE WILL TREAT THE CURRENT BPM DISPLAY AS THE RESTING HEART RATE
-//WHEN THE USER CLICKS THE START CALM BUTTON, WE WILL PLAY MUSIC AND SCAN IF THE USERS CURRENT BPM REDUCES BY 3
-//FOR ATLEAST 3 SECONDS, IF THAT IS THE CASE, THE USER STATE BADGE TO THE RIGHT OF THE GRAPH WILL DENOTE THAT THE USER IS CALM, 
-//OTHERWISE IT IS DENOTED AS RESTING
+import controlP5.*;
 
-//FOR STRESSED MODE, THE CURRENT BPM WILL AGAIN BE USED AS THE RESTING HEART RATE. WHEN THE USER PRESSES THE STRESSED MODE BUTTON
-// A TIMER FOR 60 SECONDS BEGINS, THIS IS THE TIME FOR OUR STRESSED MODE TRIAL RUN, IF CURRENT BPM GOES ABOVE BY 8 BPM FOR AT LEAST 
-// 3 SECONDS, WE DENOTE THAT THE USER IS STRESSED. AFTER 60 SECONDS STRESSED MODE STOPS. WHEN USERS STATE IS DENOTED AS STRESSED
-// THE BUZZER WILL SOUND 
-//STRESS DETECTION IS ONLY ACTIVE WHEN STRESS MODE IS CLICKED BY THE USER. 
-
-import controlP5.*; 
-
-//graph positioning on screen
-float graphX=10, graphY=-5, graphW, graphH;
-
-//left panel positioning on screen
+// layout
+float graphX = 10, graphY = -5, graphW, graphH;
 float lpX = 10, lpY = 10, lpW = 260, lpH;
 
+// baseline
+boolean baselineActive = false;
+long    baselineStartMs = 0;
+int     baselineDurationMs = 30000;
+IntList baselineSamples = new IntList();
+int     baselineHR = 0;
 
-// CALM MODE globals
-boolean calmActive = false; 
-long calmStartMs = 0; 
+// calm mode
+boolean calmActive = false;
+long    calmStartMs = 0;
 
-int     restingHR = 0;         // set at Calm start or the first good sample we get of the current bpm
-int     calmDeltaBpm = 3;      // threshold to call it Calm
-int     calmMinConf  = 40;     // ignore low-confidence
-int     calmDwellMs  = 3000;   // hold 3 sec to switch
+int     calmDeltaBpm = 3;  // <= baseline-3 for calm
+int     calmMinConf  = 40;
+int     calmDwellMs  = 3000;
 
-boolean userIsCalm = false;    // state: true = Calm, false = Resting
-long    calmCandidateStart = 0;
+boolean userIsCalm = false;     // classifier output
+long    calmCandidateStart = 0; // dwell timers
 long    restCandidateStart = 0;
 
-
-// STRESSED MODE GLOBALS
+// stressed mode
 boolean stressedActive = false;
 long    stressedStartMs = 0;
-int     stressedDurationMs = 60000;  // 60 seconds
+int     stressedDurationMs = 60000;
 
-int     stressedDeltaBpm = 5;        // threshhold to call it stressed
-int     stressedDwellMs  = 3000;     // hold 3 sec to switch
+int     stressedDeltaBpm = 5;        // >= baseline+5 for stressed
+int     stressedDwellMs  = 3000;
 
-boolean userIsStressed   = false;    // stressed state flag
-long    stressedCandStart = 0;       // timer for becoming stressed
-long    deStressCandStart = 0;       // timer for returning to resting
+boolean userIsStressed   = false;    // classifier output
+long    stressedCandStart = 0;
+long    deStressCandStart = 0;
 
-
-//logic for stressed response buzzer TODO BROKEN
+//might not even need this but just keep it there idk
 boolean prevUserIsStressed = false;
 
-
-//functions for calm mode
+//helpers
 void startCalm() {
   if (calmActive) return;
   playMP3("piano.mp3");
   calmStartMs = millis();
   calmActive = true;
-  
-  // capture resting from current reading if it's decent otherwise grab it in draw()
-  int hr = graphGetHR();
-  int conf = graphGetConf();
-  restingHR = (conf >= calmMinConf && hr > 0) ? hr : 0;
-  
-  userIsCalm = false;
-  calmCandidateStart = 0;
-  restCandidateStart = 0;
 }
 
-//stops the music when we want 
 void stopCalm() {
   calmActive = false;
   stopMP3();
 }
 
-//functions for stressed mode
 void startStressed() {
   if (stressedActive) return;
   stressedActive   = true;
   stressedStartMs  = millis();
-  userIsStressed   = false;
-  //prevUserIsStressed = false;
   stressedCandStart = 0;
   deStressCandStart = 0;
-
-  // If restingHR not captured yet, try to snapshot from current reading
-  int hr = graphGetHR();
-  int conf = graphGetConf();
-  if (restingHR == 0 && conf >= calmMinConf && hr > 0) {
-    restingHR = hr;
-  }
 }
 
 void stopStressed() {
   stressedActive = false;
-
-  stressedCandStart = 0;           
+  stressedCandStart = 0;
   deStressCandStart = 0;
+  //stop the fucking beeping bro hoky fuck
+  try { myPort.write("stop please"); } catch (Exception ex) { println("Serial write failed: " + ex); }
+
 }
 
+void startBaseline(){
+  baselineActive = true;
+  baselineStartMs = millis();
+  baselineSamples.clear();
+  baselineHR = 0;
+  println("Baseline started…");
+}
 
+void stopBaseline(){
+  baselineActive = false;
+  if (baselineSamples.size() > 0) {
+    float sum = 0;
+    for (int i = 0; i < baselineSamples.size(); i++) sum += baselineSamples.get(i);
+    baselineHR = round(sum / baselineSamples.size());
+    println("Baseline set to " + baselineHR + " bpm from " + baselineSamples.size() + " samples.");
+  } else {
+    println("Baseline cancelled / no samples.");
+  }
+}
+
+// setup
 void setup() {
   size(1000, 640);
-  lpH = height - 20; 
+  lpH = height - 20;
   graphW = width - graphX - 10;
   graphH = height - graphY - 20;
 
-  graphSetup();
-  
-  cp5.addButton("calmButton")
-     .setLabel("Calm Mode")
-     .setPosition(int(lpX+14), int(lpY+60))
-     .setSize(220, 28);
-  
-  cp5.addButton("stopCalmButton")
-     .setLabel("Stop Calm Mode")
-     .setPosition(int(lpX+14), int(lpY+98))
-     .setSize(220, 28);
-     
-  cp5.addButton("startStressedButton")
-   .setLabel("Stressed (60s)")
-   .setPosition(int(lpX+14), int(lpY+140))
-   .setSize(220, 34);
+  graphSetup();  // from graph.pde
 
-  cp5.addButton("stopStressedButton")
-   .setLabel("Stop Stressed")
-   .setPosition(int(lpX+14), int(lpY+182))
-   .setSize(220, 34);
-     
- PFont btnFont = createFont("Arial", 8);
- cp5.getController("calmButton").getCaptionLabel().setFont(btnFont).toUpperCase(false);
- cp5.getController("stopCalmButton").getCaptionLabel().setFont(btnFont).toUpperCase(false);
- cp5.getController("startStressedButton").getCaptionLabel().setFont(btnFont).toUpperCase(false);
- cp5.getController("stopStressedButton").getCaptionLabel().setFont(btnFont).toUpperCase(false);
+  // Buttons (ControlP5)
+  cp5.addButton("calmButton").setLabel("Calm Mode").setPosition(int(lpX+14), int(lpY+60)).setSize(220, 28);
+  cp5.addButton("stopCalmButton").setLabel("Stop Calm Mode").setPosition(int(lpX+14), int(lpY+98)).setSize(220, 28);
+  cp5.addButton("startStressedButton").setLabel("Stressed (60s)").setPosition(int(lpX+14), int(lpY+140)).setSize(220, 34);
+  cp5.addButton("stopStressedButton").setLabel("Stop Stressed").setPosition(int(lpX+14), int(lpY+182)).setSize(220, 34);
+  cp5.addButton("startBaselineButton").setLabel("Start 30s Baseline").setPosition(int(lpX+14), int(lpY+224)).setSize(220, 28);
+  cp5.addButton("stopBaselineButton").setLabel("Stop Baseline (Compute)").setPosition(int(lpX+14), int(lpY+262)).setSize(220, 28);
+
+  PFont btnFont = createFont("Arial", 8);
+  cp5.getController("calmButton").getCaptionLabel().setFont(btnFont).toUpperCase(false);
+  cp5.getController("stopCalmButton").getCaptionLabel().setFont(btnFont).toUpperCase(false);
+  cp5.getController("startStressedButton").getCaptionLabel().setFont(btnFont).toUpperCase(false);
+  cp5.getController("stopStressedButton").getCaptionLabel().setFont(btnFont).toUpperCase(false);
+  cp5.getController("startBaselineButton").getCaptionLabel().setFont(btnFont).toUpperCase(false);
+  cp5.getController("stopBaselineButton").getCaptionLabel().setFont(btnFont).toUpperCase(false);
 }
 
-//per-button callbacks
-void calmButton()      { startCalm(); }
-void stopCalmButton()  { stopCalm();  }
-void startStressedButton(){ startStressed(); }
-void stopStressedButton(){  stopStressed();  }
+// Button callbacks
+void calmButton()            { startCalm(); }
+void stopCalmButton()        { stopCalm();  }
+void startStressedButton()   { startStressed(); }
+void stopStressedButton()    { stopStressed();  }
+void startBaselineButton()   { startBaseline(); }
+void stopBaselineButton()    { stopBaseline();  }
 
-
+//draw
 void draw() {
   background(18);
 
-  //left panel
+  // Left panel
   pushStyle();
-  noStroke(); 
-  fill(28); 
+  noStroke();
+  fill(28);
   rect(lpX, lpY, lpW, lpH, 12);
-
 
   float cx = lpX + lpW/2.0, cy = lpY + lpH/2.0;
   int hr = graphGetHR();
   int conf = graphGetConf();
-  // Big HR and confidence displayed on the left side of the screen
-  fill(240); textAlign(CENTER, CENTER); textSize(42); text(hr, cx, cy - 10);
-  textSize(16); fill(180); text("Current bpm", cx, cy + 22);
-  // Confidence
-  textSize(14); fill(conf >= 80 ? 0xFFB4FFB4 : 0xFFE0C080);
-  text("confidence: " + conf + "%", cx, cy + 44);
-  popStyle(); //careful
 
-  // right panel and graph size 
-  noFill();
-  stroke(90);
+  // Vitals
+  fill(240); textAlign(CENTER, CENTER); textSize(42); text(hr, cx, cy);
+  textSize(16); fill(180); text("Current bpm", cx, cy + 32);
+  textSize(14); fill(conf >= 80 ? 0xFFB4FFB4 : 0xFFE0C080); text("confidence: " + conf + "%", cx, cy + 64);
 
+  // Baseline progress
+  if (baselineActive) {
+    if (conf >= calmMinConf && hr > 0) baselineSamples.append(hr);
+    int remain = max(0, baselineDurationMs - int(millis() - baselineStartMs));
+    if (remain <= 0) stopBaseline();
 
-  // Original chart box inside graphDraw():
-  int srcX = 50, srcY = 100;   // where it starts inside graphDraw()
-  int srcW = 300, srcH = 200;  // chart size inside graphDraw()
-  
-  // Pick new chart size if needed
-  int targetW = 400;
-  int targetH = 300;
-  
-  // Scale factors to enlarge the chart
-  float sx = targetW / (float)srcW;
-  float sy = targetH / (float)srcH;
-  
-  // bounding box
-  float bboxW = srcX * sx + targetW;
-  float bboxH = srcY * sy + targetH;
-  
-  // center that bounding box inside the right panel
+    fill(180); textAlign(CENTER, TOP); textSize(12);
+    text("Baseline recording… " + nf(remain/1000, 2) + "s left (" + baselineSamples.size() + " samples)",
+         lpX + lpW/2, cy + 80);
+  }
+  if (baselineHR > 0) {
+    fill(180); textAlign(CENTER, TOP); textSize(12);
+    text("Baseline: " + baselineHR + " bpm", lpX + lpW/2, cy + 80);
+  }
+  popStyle();
+
+  // Right panel: scale/center graph
+  noFill(); stroke(90);
+  int srcX = 50, srcY = 100, srcW = 300, srcH = 200;
+  int targetW = 400, targetH = 300;
+  float sx = targetW / (float)srcW, sy = targetH / (float)srcH;
+  float bboxW = srcX * sx + targetW, bboxH = srcY * sy + targetH;
   pushMatrix();
   translate(graphX, graphY);
-  float offX = (graphW - bboxW) * 0.5f;
-  float offY = (graphH - bboxH) * 0.5f;
+  float offX = (graphW - bboxW) * 0.5f, offY = (graphH - bboxH) * 0.5f;
   translate(offX, offY);
-  
-  // Scale only the graph
   scale(sx, sy);
   graphDraw();
   popMatrix();
-  
-  pushMatrix(); 
-  translate(graphX, graphY);
-  
-  popMatrix();
-  
-  
-  //Calm detection logic
-  // If restingHR wasn't captured at button press, grab the first good sample
-  if (calmActive && restingHR == 0 && conf >= calmMinConf && hr > 0) {
-    restingHR = hr;
-  }
 
-  if (calmActive && restingHR > 0 && conf >= calmMinConf) {
+  // calm detection
+  if (baselineHR > 0 && conf >= calmMinConf) {
     long now = millis();
-
     if (!userIsCalm) {
-      // Looking to become Calm: HR <= resting - delta for calmDwellMs
-      if (hr <= restingHR - calmDeltaBpm) {
+      // become Calm
+      if (hr <= baselineHR - calmDeltaBpm) {
         if (calmCandidateStart == 0) calmCandidateStart = now;
         if (now - calmCandidateStart >= calmDwellMs) {
           userIsCalm = true;
@@ -223,8 +189,8 @@ void draw() {
         calmCandidateStart = 0;
       }
     } else {
-      // Currently Calm flip back to Resting if HR >= resting for calmDwellMs
-      if (hr >= restingHR) {
+      // leave Calm
+      if (hr >= baselineHR) {
         if (restCandidateStart == 0) restCandidateStart = now;
         if (now - restCandidateStart >= calmDwellMs) {
           userIsCalm = false;
@@ -235,106 +201,79 @@ void draw() {
       }
     }
   } else {
-    // Not active / no baseline / low confidence -> reset timers
+    // no good signal/baseline -> reset dwell timers
     calmCandidateStart = 0;
     restCandidateStart = 0;
   }
-  
- //stress detection logic
-// If we still don't have a baseline and Stressed is running, grab first good sample
-if (stressedActive && restingHR == 0 && conf >= calmMinConf && hr > 0) {
-  
-  restingHR = hr;
-}
 
-if (stressedActive && restingHR > 0 && conf >= calmMinConf) {
-  long now = millis();
-
-  if (!userIsStressed) {
-    // Becoming stressed: HR >= resting + delta for stressedDwellMs
-    if (hr >= restingHR + stressedDeltaBpm) {
-      if (stressedCandStart == 0) stressedCandStart = now;
-      if (now - stressedCandStart >= stressedDwellMs) {
-        userIsStressed = true;
-        deStressCandStart = 0;
-      }
-    } else {
-      stressedCandStart = 0; // condition broke
-    }
-  } else {
-    // Currently stressed flip back to resting if HR <= resting + 1 for dwell
-    if (hr <= restingHR + 1) {
-      if (deStressCandStart == 0) deStressCandStart = now;
-      if (now - deStressCandStart >= stressedDwellMs) {
-        userIsStressed = false;
+  //stressed detection
+  if (baselineHR > 0 && conf >= calmMinConf) {
+    long now = millis();
+    if (!userIsStressed) {
+      // become Stressed
+      if (hr >= baselineHR + stressedDeltaBpm) {
+        if (stressedCandStart == 0) stressedCandStart = now;
+        if (now - stressedCandStart >= stressedDwellMs) {
+          userIsStressed = true;
+          deStressCandStart = 0;
+        }
+      } else {
         stressedCandStart = 0;
       }
     } else {
-      deStressCandStart = 0;
+      // leave Stressed
+      if (hr <= baselineHR + 1) {
+        if (deStressCandStart == 0) deStressCandStart = now;
+        if (now - deStressCandStart >= stressedDwellMs) {
+          userIsStressed = false;
+          stressedCandStart = 0;
+        }
+      } else {
+        deStressCandStart = 0;
+      }
     }
   }
-}
 
-// TODO BROKEN
-if (!prevUserIsStressed && userIsStressed) {
-  try {
-    myPort.write('b');   // sends the command to Arduino
-  } catch (Exception ex) {
-    println("Serial write failed: " + ex);
+  // buzzer logic
+  if (baselineHR > 0 && userIsStressed) {
+    println("BEEP edge: hr=" + hr + " baseline=" + baselineHR + " conf=" + conf);
+    try { myPort.write('b'); } catch (Exception ex) { println("Serial write failed: " + ex); }
   }
-}
-//////////////////
+  prevUserIsStressed = userIsStressed;
 
+  // auto stop stress mode after 60 sec
+  if (stressedActive && (millis() - stressedStartMs >= stressedDurationMs)) stopStressed();
 
-prevUserIsStressed = userIsStressed;
+  // stress mode overlay
+  if (stressedActive) {
+    int remain = max(0, stressedDurationMs - int(millis() - stressedStartMs));
+    float pad = 12, w = 220, h = 72;
+    float x = graphX + pad, y = graphY + pad;
+    pushStyle();
+    noStroke(); fill(30, 200); rect(x, y, w, h, 10);
+    fill(230); textAlign(CENTER, TOP); textSize(14);
+    text("Stressed Mode", x + 700, y + 8);
+    text("Time left: " + nf(remain/1000, 2) + "s", x + 700, y + 28);
+    popStyle();
+  }
 
-// Auto-stop Stressed after 60 sec
-if (stressedActive && (millis() - stressedStartMs >= stressedDurationMs)) {
-  stopStressed();
-}
+  //user state badge 
+  String label;
+  color labelColor;
+  if (userIsStressed) {
+    label = "Stressed"; labelColor = color(255,120,120);
+  } else if (userIsCalm) {
+    label = "Calm";     labelColor = color(140,220,170);
+  } else {
+    label = "Resting";  labelColor = color(210);
+  }
 
-//stressed mode overlay
-if (stressedActive) {
-  int remain = max(0, stressedDurationMs - int(millis() - stressedStartMs));
-  float pad = 12, w = 220, h = 72;
-  float x = graphX + pad, y = graphY + pad;
+  float pad = 12, bw = 190, bh = 54;
+  float bx = graphX + graphW - bw - pad;
+  float by = graphY + pad;
   pushStyle();
-  noStroke(); fill(30, 200); rect(x, y, w, h, 10);
-  fill(230); textAlign(CENTER, TOP); textSize(14);
-  text("Stressed Mode", x+700, y+8);
-  text("Time left: " + nf(remain/1000, 2) + "s", x+700, y+28);
-  fill(userIsStressed ? color(255,120,120) : color(200));
-
+  noStroke(); fill(30, 200); rect(bx, by, bw, bh, 10);
+  fill(200); textAlign(CENTER, TOP); textSize(14); text("User is:", bx + bw/2, by + 6);
+  fill(labelColor); textAlign(CENTER, CENTER); textSize(20); text(label, bx + bw/2, by + bh/2 + 6);
   popStyle();
 }
-  
-//User is: label on top-right of the GRAPH panel
-String label;
-color labelColor;
-
-// Priority: Stressed, then Calm (if calm logic said calm), else Resting
-if (stressedActive && userIsStressed) {
-  label = "Stressed"; labelColor = color(255,120,120);
-} else if (calmActive && userIsCalm) {
-  label = "Calm";     labelColor = color(140,220,170);
-} else {
-  label = "Resting";  labelColor = color(210);
-}
-
-// draw the badge at top-right of graph panel
-float pad = 12, w = 190, h = 54;
-float bx = graphX + graphW - w - pad;
-float by = graphY + pad;
-pushStyle();
-noStroke(); fill(30, 200); rect(bx, by, w, h, 10);
-fill(200); textAlign(CENTER, TOP); textSize(14); text("User is:", bx + w/2, by + 6);
-fill(labelColor); textAlign(CENTER, CENTER); textSize(20); text(label, bx + w/2, by + h/2 + 6);
-popStyle();
-  
-}
-//  void keyPressed() {
-//  if (key == 'b' || key == 'B') {
-//    println(">>> manual BEEP2");
-//    myPort.write('b');
-//  }
-//}
