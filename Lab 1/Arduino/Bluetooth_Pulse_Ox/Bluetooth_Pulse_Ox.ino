@@ -130,8 +130,6 @@ void loop(){
     doc["Stat"] = body.status;
     serializeJson(doc, Serial);
 
-
-  //TODO BROKEN
   // listen for a command from Processing and beep twice when requested
   while (Serial.available() > 0) {
     int c = Serial.read();
