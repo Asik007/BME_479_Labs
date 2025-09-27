@@ -6,6 +6,7 @@ import processing.serial.*;
 ControlP5 cp5;
 Serial myPort;
 String inString = ""; 
+int age = 9999;
 
 
 //getters for confidence and Heartrate
@@ -15,8 +16,8 @@ int lastConf = 0;
 
 
 class LineChart {
-  int min = 20;
-  int max = 120;
+  int min = 0;
+  int max = 220;
   IntList values;
   IntList colors;
   LineChart(int size){
@@ -40,6 +41,10 @@ class LineChart {
       line(leftPointX,leftPointY,rightPointX,rightPointY);
     }
   }
+  void addShift(){
+    int lastIndex = values.size()-1;
+    addShift(values.get(lastIndex),colors.get(lastIndex));
+  }
   void addShift(int v, color c){
     
     //line kept bleeding off graph so I added this
@@ -54,17 +59,29 @@ class LineChart {
 
 color RED = color(255,0,0);
 color YELLOW = color(255,255,0);
+color GREEN = color(0,255,0);
+color BLUE = color(0,0,255);
+color WHITE = color(255,255,255);
 
 LineChart myChart;
+Chart pieChart;
+float[] pieChartData = {1,1,1,1,1};
 
 void graphSetup(){
  // size(400,400);
   cp5 = new ControlP5(this);
-  cp5.addTextfield("age")
+  cp5.addTextfield("ageInput")
     .setPosition(40,20)
     .setAutoClear(false)
     ;
-  
+  pieChart = cp5.addChart("pieChart")
+    .setPosition(300,25)
+    .setView(Chart.PIE)
+    .setSize(200,200)
+    .addDataSet("data1")
+    .setColors("data1",RED,YELLOW,GREEN,BLUE,WHITE)
+    .setData("data1",pieChartData)
+    ;
   
   myPort = new Serial(this, Serial.list()[0], 115200);
   myPort.clear();
@@ -72,11 +89,20 @@ void graphSetup(){
   myChart = new LineChart(300);
 }
 
+public void ageInput(String theText){
+  age = int(theText);
+  pieChartData[0] = 0;
+  pieChartData[1] = 0;
+  pieChartData[2] = 0;
+  pieChartData[3] = 0;
+  pieChartData[4] = 0;
+}
+
 void graphDraw(){
   //myChart.addShift(int(random(20,120)),RED);
+  
   myChart.draw(50,100,300,200);
-  //println("Hello world");
-  //printArray(Serial.list());
+  pieChart.setData("data1",pieChartData);
 }
 
 void serialEvent(Serial p) { 
@@ -90,11 +116,32 @@ void serialEvent(Serial p) {
       println("JSONObject could not be parsed");
     } else {
       println(json);
-      myChart.addShift(json.getInt("HR"),RED);
-      
       //added getters
       lastHR = json.getInt("HR");
       lastConf = json.getInt("Conf"); 
+      
+      if (json.getInt("Stat") == 3){
+        int heartPerformance = (lastHR*100)/(220-age);
+        if (heartPerformance >= 90){
+          myChart.addShift(lastHR,RED);
+          pieChartData[0]++;
+        } else if (heartPerformance >= 80){
+          myChart.addShift(lastHR,YELLOW);
+          pieChartData[1]++;
+        } else if (heartPerformance >= 70){
+          myChart.addShift(lastHR,GREEN);
+          pieChartData[2]++;
+        } else if (heartPerformance >= 60){
+          myChart.addShift(lastHR,BLUE);
+          pieChartData[3]++;
+        } else {
+          myChart.addShift(lastHR,WHITE);
+          pieChartData[4]++;
+        }
+      }else{
+        myChart.addShift();
+      }
+      
     }
     // HR, Conf, Stat
     // Stat needs to be 3
