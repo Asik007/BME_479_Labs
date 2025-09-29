@@ -141,7 +141,7 @@ void loop(){
   }
 
 // small pacing delay
-delay(100);
+delay(500);
 
     
     //   tone(Buzzer, 10000);
