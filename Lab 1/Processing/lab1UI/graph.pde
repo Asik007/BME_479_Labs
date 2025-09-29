@@ -84,7 +84,8 @@ void graphSetup(){
     .setData("data1",pieChartData)
     ;
   
-  myPort = new Serial(this, Serial.list()[0], 115200);
+  myPort = new Serial(this, Serial.list()[1], 115200);
+  println(Serial.list()[1]);
   myPort.clear();
   
   myChart = new LineChart(300);
