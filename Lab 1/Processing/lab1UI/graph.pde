@@ -88,6 +88,9 @@ void graphSetup(){
   println(Serial.list()[1]);
   myPort.clear();
   
+ //
+ myPort.bufferUntil('\n');
+  
   myChart = new LineChart(300);
 }
 
@@ -107,64 +110,111 @@ void graphDraw(){
   pieChart.setData("data1",pieChartData);
 }
 
-void serialEvent(Serial p) { 
-  String temp = p.readString();
-  inString += temp;
-  if (temp.equals("}")){
-    //println(inString);
+//void serialEvent(Serial p) { 
+//  String temp = p.readString();
+//  inString += temp;
+//  if (temp.equals("}")){
+//    //println(inString);
     
-    JSONObject json = parseJSONObject(inString);
-    if (json == null) {
-      println("JSONObject could not be parsed");
-    } else {
-      println(json);
-      //added getters
-      lastHR = json.getInt("HR");
-      lastConf = json.getInt("Conf"); 
-      lastSpO2 = json.getInt("SpO2"); 
+//    JSONObject json = parseJSONObject(inString);
+//    if (json == null) {
+//      println("JSONObject could not be parsed");
+//    } else {
+//      println(json);
+//      //added getters
+//      lastHR = json.getInt("HR");
+//      lastConf = json.getInt("Conf"); 
+//      lastSpO2 = json.getInt("SpO2"); 
       
-      if (json.getInt("Stat") == 3){
-        int heartPerformance = (lastHR*100)/(220-age);
-        if (heartPerformance >= 90){
-          myChart.addShift(lastHR,RED);
-          pieChartData[0]++;
-        } else if (heartPerformance >= 80){
-          myChart.addShift(lastHR,YELLOW);
-          pieChartData[1]++;
-        } else if (heartPerformance >= 70){
-          myChart.addShift(lastHR,GREEN);
-          pieChartData[2]++;
-        } else if (heartPerformance >= 60){
-          myChart.addShift(lastHR,BLUE);
-          pieChartData[3]++;
-        } else {
-          myChart.addShift(lastHR,WHITE);
-          pieChartData[4]++;
-        }
+//      if (json.getInt("Stat") == 3){
+//        int heartPerformance = (lastHR*100)/(220-age);
+//        if (heartPerformance >= 90){
+//          myChart.addShift(lastHR,RED);
+//          pieChartData[0]++;
+//        } else if (heartPerformance >= 80){
+//          myChart.addShift(lastHR,YELLOW);
+//          pieChartData[1]++;
+//        } else if (heartPerformance >= 70){
+//          myChart.addShift(lastHR,GREEN);
+//          pieChartData[2]++;
+//        } else if (heartPerformance >= 60){
+//          myChart.addShift(lastHR,BLUE);
+//          pieChartData[3]++;
+//        } else {
+//          myChart.addShift(lastHR,WHITE);
+//          pieChartData[4]++;
+//        }
    
-      }else{
-        myChart.addShift();
-      }
+//      }else{
+//        myChart.addShift();
+//      }
       
-    }
-    // HR, Conf, Stat
-    // Stat needs to be 3
-    // Conf need to be not 0
-    inString = "";
+//    }
+//    // HR, Conf, Stat
+//    // Stat needs to be 3
+//    // Conf need to be not 0
+//    inString = "";
     
-  }
+//  }
   
 
-  /*
-  JSONObject json = parseJSONObject(inString);
-  if (json == null) {
-    println("JSONObject could not be parsed");
-  } else {
-    String species = json.getString("species");
-    println(species);
+//  /*
+//  JSONObject json = parseJSONObject(inString);
+//  if (json == null) {
+//    println("JSONObject could not be parsed");
+//  } else {
+//    String species = json.getString("species");
+//    println(species);
+//  }
+//  */
+//} 
+
+void serialEvent(Serial p) {
+  String line = p.readStringUntil('\n');
+  if (line == null) return;
+
+  line = trim(line);
+  if (line.length() == 0) return;
+
+  // Ignore non-JSON noise (e.g., "Sensor started!" etc.)
+  int s = line.indexOf('{');
+  int e = line.lastIndexOf('}');
+  if (s < 0 || e < s) {
+    // println("NON-JSON:", line);  // uncomment to debug
+    return;
   }
-  */
-} 
+
+  String jsonStr = line.substring(s, e + 1);
+  // println("JSON:", jsonStr);    // uncomment to debug
+
+  JSONObject json = parseJSONObject(jsonStr);
+  if (json == null) {
+    println("JSON parse failed:", jsonStr);
+    return;
+  }
+
+  // Safely pull fields (default to 0 if missing)
+  lastHR   = json.hasKey("HR")   ? json.getInt("HR")   : 0;
+  lastConf = json.hasKey("Conf") ? json.getInt("Conf") : 0;
+  lastSpO2 = json.hasKey("SpO2") ? json.getInt("SpO2") : 0;
+  int stat = json.hasKey("Stat") ? json.getInt("Stat") : 0;
+
+  // Only push onto the chart if finger present & we have a sane age
+  int maxHR = 220 - constrain(age, 0, 120);
+  maxHR = max(100, maxHR); // avoid silly values
+
+  if (stat == 3 && lastHR > 0) {
+    int heartPerformance = int((lastHR * 100.0) / maxHR);
+    if      (heartPerformance >= 90) { myChart.addShift(lastHR, RED);    pieChartData[0]++; }
+    else if (heartPerformance >= 80) { myChart.addShift(lastHR, YELLOW); pieChartData[1]++; }
+    else if (heartPerformance >= 70) { myChart.addShift(lastHR, GREEN);  pieChartData[2]++; }
+    else if (heartPerformance >= 60) { myChart.addShift(lastHR, BLUE);   pieChartData[3]++; }
+    else                             { myChart.addShift(lastHR, WHITE);  pieChartData[4]++; }
+  } else {
+    myChart.addShift();
+  }
+}
+
 
 //getter functions 
 int graphGetHR() {return lastHR;}
