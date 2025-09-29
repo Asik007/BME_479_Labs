@@ -138,6 +138,7 @@ void serialEvent(Serial p) {
           myChart.addShift(lastHR,WHITE);
           pieChartData[4]++;
         }
+   
       }else{
         myChart.addShift();
       }
@@ -147,6 +148,7 @@ void serialEvent(Serial p) {
     // Stat needs to be 3
     // Conf need to be not 0
     inString = "";
+    
   }
   
 

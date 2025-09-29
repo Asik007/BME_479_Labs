@@ -29,9 +29,9 @@
 #include <Wire.h>
 
 // Reset pin, MFIO pin
-int resPin = 4;
-int mfioPin = 13;
-const int Buzzer = 12;
+int resPin = 7;
+int mfioPin = 6;
+const int Buzzer = 10;
 
 // Takes address, reset pin, and MFIO pin.
 SparkFun_Bio_Sensor_Hub bioHub(resPin, mfioPin); 
@@ -78,14 +78,14 @@ void setup(){
 
   
   Wire.begin();
-  int result = bioHub.begin();
+  int result = bioHub.begin();  
   if (result == 0) // Zero errors!
     Serial.println("Sensor started!");
   else
     Serial.println("Could not communicate with the sensor!");
  
   Serial.println("Configuring Sensor...."); 
-  int error = bioHub.configBpm(MODE_ONE); // Configuring just the BPM settings. 
+  int error = bioHub.configBpm(MODE_TWO); // Configuring just the BPM settings. 
   if(error == 0){ // Zero errors!
     Serial.println("Sensor configured.");
   }
@@ -128,6 +128,7 @@ void loop(){
     doc["HR"] = body.heartRate;
     doc["Conf"] = body.confidence;
     doc["Stat"] = body.status;
+    doc["SpO2"] = body.oxygen;
     serializeJson(doc, Serial);
     Serial.println("");
 
@@ -140,7 +141,7 @@ void loop(){
   }
 
 // small pacing delay
-delay(10);
+delay(100);
 
     
     //   tone(Buzzer, 10000);
