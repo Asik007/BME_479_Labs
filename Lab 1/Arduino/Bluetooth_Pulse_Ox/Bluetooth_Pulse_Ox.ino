@@ -129,6 +129,7 @@ void loop(){
     doc["Conf"] = body.confidence;
     doc["Stat"] = body.status;
     serializeJson(doc, Serial);
+    Serial.println("");
 
   // listen for a command from Processing and beep twice when requested
   while (Serial.available() > 0) {
@@ -136,7 +137,7 @@ void loop(){
     if(c == 'b' || c == 'B'){
       beepTwice();
     }
-}
+  }
 
 // small pacing delay
 delay(10);
