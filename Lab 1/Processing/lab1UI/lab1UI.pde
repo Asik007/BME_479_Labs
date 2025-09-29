@@ -79,6 +79,7 @@ void startBaseline(){
   println("Baseline started…");
 }
 
+//get average
 void stopBaseline(){
   baselineActive = false;
   if (baselineSamples.size() > 0) {
@@ -143,6 +144,11 @@ void draw() {
   fill(240); textAlign(CENTER, CENTER); textSize(42); text(hr, cx, cy);
   textSize(16); fill(180); text("Current bpm", cx, cy + 32);
   textSize(14); fill(conf >= 80 ? 0xFFB4FFB4 : 0xFFE0C080); text("confidence: " + conf + "%", cx, cy + 64);
+  
+  //the time between beats
+  int ibi = graphGetIBI();
+  textSize(14); fill(180);
+  text("~ " + ibi + " ms between beats", cx, cy + 86);
 
   // Baseline progress
   if (baselineActive) {

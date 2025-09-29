@@ -12,7 +12,8 @@ int age = 9999;
 //getters for confidence and Heartrate
 int lastHR = 0;
 int lastConf = 0;
-//need blood oxygen level, interval between heart beats
+int lastSpO2 = 0; //oxygen
+//Need interval between heart beats
 
 
 class LineChart {
@@ -119,6 +120,7 @@ void serialEvent(Serial p) {
       //added getters
       lastHR = json.getInt("HR");
       lastConf = json.getInt("Conf"); 
+      lastSpO2 = json.getInt("SpO2"); 
       
       if (json.getInt("Stat") == 3){
         int heartPerformance = (lastHR*100)/(220-age);
@@ -166,3 +168,7 @@ void serialEvent(Serial p) {
 //getter functions 
 int graphGetHR() {return lastHR;}
 int graphGetConf() { return lastConf; }
+int graphGetSpO2() { return lastSpO2; }
+int graphGetIBI() {
+  return (lastHR > 0) ? int(60000.0 / lastHR) : 0;  // ms between beats (approx)
+}
