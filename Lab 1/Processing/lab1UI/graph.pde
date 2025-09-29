@@ -13,7 +13,7 @@ int age = 9999;
 int lastHR = 0;
 int lastConf = 0;
 int lastSpO2 = 0; //oxygen
-//Need interval between heart beats
+
 
 
 class LineChart {

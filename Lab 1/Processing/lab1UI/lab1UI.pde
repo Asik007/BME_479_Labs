@@ -149,6 +149,10 @@ void draw() {
   int ibi = graphGetIBI();
   textSize(14); fill(180);
   text("~ " + ibi + " ms between beats", cx, cy + 86);
+  
+  // SpO2 line
+  String spo2Text = (graphGetSpO2() > 0) ? (graphGetSpO2() + "% SpO₂") : "SpO₂ —";
+  text(spo2Text, cx, cy + 104);
 
   // Baseline progress
   if (baselineActive) {
