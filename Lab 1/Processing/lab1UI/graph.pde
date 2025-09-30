@@ -83,9 +83,9 @@ void graphSetup(){
     .setColors("data1",RED,YELLOW,GREEN,BLUE,WHITE)
     .setData("data1",pieChartData)
     ;
-  
-  myPort = new Serial(this, Serial.list()[1], 115200);
-  println(Serial.list()[1]);
+  println(Serial.list());
+  myPort = new Serial(this, Serial.list()[0], 115200);
+  //println(Serial.list()[1]);
   myPort.clear();
   
  //
@@ -198,6 +198,16 @@ void serialEvent(Serial p) {
   lastConf = json.hasKey("Conf") ? json.getInt("Conf") : 0;
   lastSpO2 = json.hasKey("SpO2") ? json.getInt("SpO2") : 0;
   int stat = json.hasKey("Stat") ? json.getInt("Stat") : 0;
+
+
+  println(
+    "HR:", lastHR,
+    "Conf:", lastConf,
+    "SpO2:", lastSpO2,
+    "Stat:", stat
+  );
+
+
 
   // Only push onto the chart if finger present & we have a sane age
   int maxHR = 220 - constrain(age, 0, 120);
